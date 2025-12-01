@@ -532,8 +532,79 @@ if uploaded_file is not None:
         with tab1:
             st.header("💰 Análisis de Operaciones")
             
-            if 'Operaciones' in reportes:
-                ops = reportes['Operaciones']
+            # Filtro por mes según Fecha cierre
+            if 'Operaciones' in dataframes:
+                df_ops_original = dataframes['Operaciones']
+                
+                # Verificar si tiene columna Fecha cierre
+                if 'Fecha cierre' in df_ops_original.columns:
+                    # Convertir a datetime si no lo es
+                    if not pd.api.types.is_datetime64_any_dtype(df_ops_original['Fecha cierre']):
+                        df_ops_original['Fecha cierre'] = pd.to_datetime(df_ops_original['Fecha cierre'], errors='coerce')
+                    
+                    # Obtener meses disponibles
+                    df_ops_original['Mes'] = df_ops_original['Fecha cierre'].dt.to_period('M')
+                    meses_disponibles = sorted(df_ops_original['Mes'].dropna().unique())
+                    
+                    # Crear opciones para el selector (formato: "Enero 2025", "Febrero 2025", etc.)
+                    meses_nombres = {
+                        1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+                        5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+                        9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+                    }
+                    opciones_mes = ['Total General'] + [
+                        f"{meses_nombres[mes.month]} {mes.year}" for mes in meses_disponibles
+                    ]
+                    
+                    # Selector de mes
+                    mes_seleccionado = st.selectbox(
+                        "📅 Filtrar por mes (Fecha de cierre)",
+                        options=opciones_mes,
+                        index=0,
+                        help="Selecciona un mes específico o 'Total General' para ver todas las operaciones"
+                    )
+                    
+                    # Filtrar DataFrame según selección
+                    if mes_seleccionado == 'Total General':
+                        df_ops_filtrado = df_ops_original.copy()
+                    else:
+                        # Buscar el mes correspondiente
+                        mes_buscado = None
+                        meses_nombres = {
+                            1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+                            5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+                            9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+                        }
+                        for mes_period in meses_disponibles:
+                            nombre_mes = f"{meses_nombres[mes_period.month]} {mes_period.year}"
+                            if nombre_mes == mes_seleccionado:
+                                mes_buscado = mes_period
+                                break
+                        
+                        if mes_buscado:
+                            df_ops_filtrado = df_ops_original[df_ops_original['Mes'] == mes_buscado].copy()
+                        else:
+                            df_ops_filtrado = df_ops_original.copy()
+                    
+                    # Eliminar columna temporal Mes
+                    if 'Mes' in df_ops_filtrado.columns:
+                        df_ops_filtrado = df_ops_filtrado.drop(columns=['Mes'])
+                    
+                    # Regenerar reporte con datos filtrados
+                    reporte_ops_filtrado = generar_reporte_operaciones(df_ops_filtrado)
+                else:
+                    # Si no hay Fecha cierre, usar reporte original
+                    reporte_ops_filtrado = reportes['Operaciones']
+                    mes_seleccionado = "Total General (sin fecha de cierre)"
+            else:
+                reporte_ops_filtrado = None
+            
+            if reporte_ops_filtrado:
+                ops = reporte_ops_filtrado
+                
+                # Mostrar mes seleccionado
+                if 'Operaciones' in dataframes and 'Fecha cierre' in dataframes['Operaciones'].columns:
+                    st.info(f"📅 Mostrando datos: **{mes_seleccionado}**")
                 
                 # Resumen financiero
                 if 'resumen_financiero' in ops:
